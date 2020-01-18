@@ -1,0 +1,1021 @@
+/*
+ * This program is a simple shooter game
+ */
+
+import javafx.application.Application;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.input.MouseButton;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.stage.Stage;
+
+/**
+ * Chappell Jones
+ * CS 1180-03
+ * Lifeng Liu
+ * Vanessa Starkey
+ */
+public class ShooterGame extends Application {
+    
+    @Override
+    public void start(Stage primaryStage) {
+        InvaderPane pane = new InvaderPane();
+        
+        //Value of dimensions for keeping score
+        HBox hBox = new HBox();
+        
+        TextField text = new TextField();
+        Label label = new Label("Score: ");
+        hBox.getChildren().add(label);
+        hBox.getChildren().add(text);
+        hBox.setAlignment(Pos.CENTER);
+        BorderPane bPane = new BorderPane();
+        text.setMaxWidth(100);
+        bPane.setCenter(pane);
+        bPane.setBottom(hBox);
+        text.setAlignment(Pos.CENTER);
+        bPane.setAlignment(hBox,Pos.CENTER);
+               
+        //The Scene
+        Scene scene = new Scene(bPane, 400, 450);   
+        pane.setStyle("-fx-background-color: gold");
+        pane.setText(text);
+        primaryStage.setTitle("Shooter Game Fall 2014");
+        primaryStage.setScene(scene);
+        primaryStage.setResizable(false);
+        primaryStage.show();
+        pane.requestFocus();
+    }
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) {
+        launch(args);
+    }
+    
+}
+
+
+
+import java.util.ArrayList;
+import javafx.scene.input.KeyCode;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.util.Duration;
+import javax.swing.JOptionPane;
+
+/*
+ * The battlefield and score panel for the game pane.
+ */
+
+public class InvaderPane extends Pane {
+
+    private Timeline animation;
+    private Timeline animation2;
+    private Timeline invaderAct;
+    private Timeline invaderAct2;
+    private Timeline bulletAct;
+    private Timeline explosionAct;
+    private Launcher launcher;
+    private int score = 0;
+    private int miss = 0;
+    private Bullet bullet;
+    private ArrayList<Invader> invaders;
+    private ArrayList< Invader> invaders2nd;
+    private ArrayList<Boom> boom;
+    private TextField text;
+    private TextField text2;
+
+    /**
+     * The main game pane
+     */
+    public InvaderPane() {
+        //Top row of invaders
+        invaders = new ArrayList();
+        boom = new ArrayList();
+        //Controls movement
+        animation = new Timeline(new KeyFrame(Duration.millis(15),
+                e -> {
+                    moveOneFrame();
+                }
+        ));
+
+        this.animation.setCycleCount(Timeline.INDEFINITE);
+        this.animation.play();
+        //Produces invader
+        invaderAct = new Timeline(new KeyFrame(Duration.millis(2500),
+                e -> {
+                    addInvader();
+                }
+        ));
+
+        this.invaderAct.setCycleCount(Timeline.INDEFINITE);
+        this.invaderAct.play();
+
+        //Bottom row of invaders
+        invaders2nd = new ArrayList();
+        //Controls movement of invader
+        animation2 = new Timeline(new KeyFrame(Duration.millis(25),
+                e -> {
+                    moveOneFrame();
+                }
+        ));
+
+        this.animation2.setCycleCount(Timeline.INDEFINITE);
+        this.animation2.play();
+
+        //Produces the invader
+        invaderAct2 = new Timeline(new KeyFrame(Duration.millis(1500),
+                e -> {
+                    add2ndInvader();
+                }
+        ));
+
+        this.invaderAct2.setCycleCount(Timeline.INDEFINITE);
+        this.invaderAct2.play();
+
+        //explosion actions
+        explosionAct = new Timeline(new KeyFrame(Duration.millis(250),
+                e -> {
+                    for (int i = 0; i < boom.size(); i++) {
+                        Boom b = boom.get(i);
+                        b.increaseTimer();
+                        if (b.getTimer() > 3) {
+                            b.destroy();
+                        }
+                    }
+                }
+        ));
+        this.explosionAct.setCycleCount(Timeline.INDEFINITE);
+        this.explosionAct.play();
+
+        //The launcher   
+        this.launcher = new Launcher(200, 409.5, 25, 50, 20, 10, 3.0, this);
+
+        //Launcher movement
+        this.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.LEFT) {
+                launcher.moveLeft();
+            } else if (e.getCode() == KeyCode.RIGHT) {
+
+                launcher.moveRight();
+
+            } else if (e.getCode() == KeyCode.SPACE) {
+                if (bullet == null) {
+                    bullet = new Bullet(2, launcher.getCenterX(), 350, this);
+                }
+            }
+        });
+
+        //bullet movement
+        bulletAct = new Timeline(new KeyFrame(Duration.millis(35),
+                e -> {
+                    if (bullet != null) {
+                        bullet.moveBullet();
+                        // Bullet action in the first row
+                        for (int i = 0; i < invaders.size(); i++) {
+
+                            Invader ship = invaders.get(i);
+                            double x1, x2;
+                            double y1, y2;
+
+                            x1 = ship.getCenterX() - ship.getWidth() * 0.5;
+                            x2 = ship.getCenterX() + ship.getWidth() * 0.5;
+                            y1 = ship.getCenterY() - ship.getHeight() * 0.5;
+                            y2 = ship.getCenterY() + ship.getHeight() * 0.5;
+                            if (bullet != null && bullet.getCenterX() > x1 && bullet.getCenterX() < x2 && bullet.getCenterY() > y1 && bullet.getCenterY() < y2) {
+                                ship.destroyInvader();
+                                invaders.remove(ship);
+                                score += 100;
+                                //Win condition
+                                if (score >= 1500) {
+                                    JOptionPane.showMessageDialog(null,"You Won!! \n" +
+                                             "Your score is " + score + " with only "+ miss +" misses");
+                                    score = 0;
+                                    miss = 0;
+                                    
+                                } else if (miss >= 7) {
+                                    JOptionPane.showMessageDialog(null,"Your score is " + score 
+                                            +" and you had "+ miss+" misses" +
+                                    "You Lose!! Try Again");
+                                    score = 0;
+                                    miss = 0;
+                                    
+                                }
+                                text.setText(score + "");
+                                //text2.setText(miss+ "");
+                                bullet.removeBullet();
+                                bullet = null;
+
+                                boom.add(new Boom(ship.getCenterX(), ship.getCenterY(), this));
+                                break;
+                            }
+                        }
+                        // Bullet action in the first row
+                        for (int j = 0; j < invaders2nd.size(); j++) {
+
+                            Invader ship = invaders2nd.get(j);
+                            double x1, x2;
+                            double y1, y2;
+
+                            x1 = ship.getCenterX() - ship.getWidth() * 0.5;
+                            x2 = ship.getCenterX() + ship.getWidth() * 0.5;
+                            y1 = ship.getCenterY() - ship.getHeight() * 0.5;
+                            y2 = ship.getCenterY() + ship.getHeight() * 0.5;
+                            if (bullet != null && bullet.getCenterX() > x1 && bullet.getCenterX() < x2 && bullet.getCenterY() > y1 && bullet.getCenterY() < y2) {
+                                ship.destroyInvader();
+                                invaders2nd.remove(ship);
+                                score += 50;
+                                //Win condition
+                                if (score >= 1500) {
+                                    JOptionPane.showMessageDialog(null,"You Won!! \n" +
+                                             "Your score is " + score + " with only "+ miss +" misses");
+                                    score = 0;
+                                    miss = 0;
+                                    
+                                } else if (miss >= 7) {
+                                    
+                                    JOptionPane.showMessageDialog(null,"Your score is " + score 
+                                            +" and you had "+ miss+" misses\n"
+                                            + " You Lose!! Try Again");
+                                    score = 0;
+                                    miss = 0;
+                                    
+                                }
+                                text.setText(score + "");
+                                //text2.setText(miss + "");
+                                bullet.removeBullet();
+                                bullet = null;
+                                boom.add(new Boom(ship.getCenterX(), ship.getCenterY(), this));
+                                break;
+                            }
+                        }
+
+                        if (bullet != null && bullet.getCenterY() < 0) {
+                            bullet.removeBullet();
+                            bullet = null;
+                            miss += 1;
+                        }
+                    }
+                }
+        ));
+
+        this.bulletAct.setCycleCount(Timeline.INDEFINITE);
+        this.bulletAct.play();
+
+    }
+
+    /**
+     * Move the invaders
+     */
+    public void moveOneFrame() {
+        for (int i = 0; i < invaders.size(); i++) {
+            invaders.get(i).moveRight();
+        }
+
+        for (int j = 0; j < invaders2nd.size(); j++) {
+            invaders2nd.get(j).moveRight();
+        }
+
+    }
+
+    /**
+     * Adds the invaders to the pane
+     */
+    public void addInvader() {
+        //First Row 
+        Color color = new Color(Math.random(), Math.random(), Math.random(), 1.0);
+        Invader i = new Invader(10, 10.5, 25, 8, color, 2.0);
+
+        invaders.add(i);
+
+        this.getChildren().add(i.getPane());
+    }
+
+    /**
+     * Adds the 2nd row of invaders to the pane
+     */
+    public void add2ndInvader() {
+
+        //Second row
+        Color color = new Color(Math.random(), Math.random(), Math.random(), 1.0);
+        Invader i2 = new Invader(10, 70, 40, 16, color, 2.0);
+
+        invaders2nd.add(i2);
+
+        this.getChildren().add(i2.getPane());
+
+    }
+
+    /**
+     * A text message is given
+     * @param text - text is placed in the pane
+     */
+    public void setText(TextField text) {
+        this.text = text;
+    }
+
+}
+
+
+/*
+ * The launcher to shoot the enemies.
+ */
+
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
+
+public class Launcher {
+
+    private double centerX;
+    private double centerY;
+    private double width;
+    private double height;
+    private double C_width;
+    private double C_height;
+    private Color color;
+    private double speed;
+    private double centery;//do not needed
+    private Rectangle cannon;
+    private Rectangle body;
+    private InvaderPane pane;
+
+    /**
+     *
+     * @param centerX
+     * @param centerY
+     * @param height
+     * @param width
+     * @param C_height
+     * @param speed
+     * @param pane
+     */
+    public Launcher(double centerX, double centerY, double height, double width,double C_height,double C_width, double speed,  InvaderPane pane) {
+        this.centerX = centerX;
+        this.centerY = centerY;
+        this.speed = speed;
+        this.width=width;
+        this.height=height;
+        this.C_height = C_height;
+        this.C_width= C_width;
+        this.cannon = new Rectangle();
+        this.body = new Rectangle();
+        this.pane = pane;
+
+        this.pane.getChildren().add(this.cannon);
+        this.pane.getChildren().add(this.body);
+        drawLauncher();
+        drawLCannon();
+    }
+
+    /**
+     *
+     * @return
+     */
+    public double getCenterX() {
+        return centerX;
+    }
+
+    /**
+     *
+     * @param centerX
+     */
+    public void setCenterX(double centerX) {
+        this.centerX = centerX;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public double getCenterY() {
+        return centerY;
+    }
+
+    /**
+     *
+     * @param centerY
+     */
+    public void setCenterY(double centerY) {
+        this.centerY = centerY;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public Color getColor() {
+        return color;
+    }
+
+    /**
+     *
+     * @param color
+     */
+    public void setColor(Color color) {
+        this.color = color;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public double getSpeed() {
+        return speed;
+    }
+
+    /**
+     *
+     * @param speed
+     */
+    public void setSpeed(double speed) {
+        this.speed = speed;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public double getCentery() {
+        return centery;
+    }
+
+    /**
+     *
+     * @param centery
+     */
+    public void setCentery(double centery) {
+        this.centery = centery;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public Rectangle getCannon() {
+        return cannon;
+    }
+
+    /**
+     *
+     * @param cannon
+     */
+    public void setCannon(Rectangle cannon) {
+        this.cannon = cannon;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public Rectangle getBody() {
+        return body;
+    }
+
+    /**
+     *
+     * @param body
+     */
+    public void setBody(Rectangle body) {
+        this.body = body;
+    }
+
+    /**
+     *
+     * @return - returns value for game pane
+     */
+    public InvaderPane getPane() {
+        return pane;
+    }
+
+    /**
+     * The variable for the game pane
+     * @param pane - the variable for the game pane
+     */
+    public void setPane(InvaderPane pane) {
+        this.pane = pane;
+    }
+
+    
+    /**
+     * Draws the body of the launcher
+     */
+    public void drawLauncher() {
+        //The body of the launcher
+        this.body.setFill(Color.RED); //Set body color
+        this.body.setHeight(this.height);
+        this.body.setWidth(this.width);
+        body.setX(centerX-width*0.5);
+        body.setY(centerY);
+        
+
+    }
+
+    /**
+     * Draws the cannon
+     */
+    public void drawLCannon() {
+        //this.cannon = new Rectangle(); //Set cannon color
+        this.cannon.setFill(Color.BLACK);
+        this.cannon.setHeight(this.C_height);
+        this.cannon.setWidth(this.C_width);
+        cannon.setX(centerX-C_width * 0.5);
+        
+        cannon.setY(centerY-C_height);
+        
+    }
+
+    /**
+     * Moves the launcher to the left
+     */
+    public void moveLeft() {
+      centerX-=7; 
+      drawLCannon();
+      drawLauncher();
+    }
+    
+    /**
+     * Moves the launcher to the right
+     */
+    public void moveRight() {
+            centerX+=7;
+            drawLCannon();
+            drawLauncher();
+    }
+}
+
+
+/*
+ * The enemy invaders to be shot at.
+ */
+
+
+
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Ellipse;
+import javafx.scene.shape.Line;
+
+
+
+
+public class Invader{
+    private double centerX;
+    private double centerY;
+    private double width;
+    private double height;
+    private Ellipse body;
+    private Color color;
+    private double speed;   
+    private Pane InvaderPane = new Pane();
+
+    /**
+     *
+     * @return
+     */
+    public double getWidth() {
+        return width;
+    }
+
+    /**
+     *
+     * @param width
+     */
+    public void setWidth(double width) {
+        this.width = width;
+    }
+
+    /**
+     *
+     * @return
+     */
+    public double getHeight() {
+        return height;
+    }
+
+    /**
+     *
+     * @param height
+     */
+    public void setHeight(double height) {
+        this.height = height;
+    }
+
+    /**
+     *
+     * @param centerX
+     * @param centerY
+     * @param width
+     * @param height
+     * @param color
+     * @param speed
+     */
+    public Invader(double centerX, double centerY, double width, double height, 
+            Color color, double speed) {
+        this.centerX = centerX;
+        this.centerY = centerY;
+        this.width = width;
+        this.height = height;
+
+        this.color = color;
+        this.speed = speed;
+        //this.pane = pane;
+        
+        this.body = new Ellipse();
+        
+          
+        InvaderPane.getChildren().add(body);
+        
+        
+        drawInvader();
+        
+    }
+
+    /**
+     * 
+     * @return - a value is returned
+     */
+    public double getCenterX() {
+        return centerX;
+    }
+
+    /**
+     * A place for the invader
+     * @param centerX - a place on X-axis
+     */
+    public void setCenterX(double centerX) {
+        this.centerX = centerX;
+        
+    }
+
+    /**
+     * Places invader on the Y-axis
+     * @return - a value is returned
+     */
+    public double getCenterY() {
+        return centerY;
+    }
+
+    /**
+     * A place for the invader
+     * @param centerY - place on the Y-axis
+     */
+    public void setCenterY(double centerY) {
+        this.centerY = centerY;
+    }
+
+    /**
+     * The body is obtained
+     * @return - a value is returned
+     */
+    public Ellipse getBody() {
+        return body;
+    }
+
+    /**
+     * The body of the invader is set
+     * @param body - body of the invader
+     */
+    public void setBody(Ellipse body) {
+        this.body = body;
+    }
+
+    /**
+     * A color is obtained
+     * @return - a value is returned
+     */
+    public Color getColor() {
+        return color;
+    }
+
+    /**
+     * A color is set
+     * @param color - the color is a parameter
+     */
+    public void setColor(Color color) {
+        this.color = color;
+    }
+
+    /**
+     * The speed is obtained
+     * @return - value is returned
+     */
+    public double getSpeed() {
+        return speed;
+    }
+
+    /**
+     * The value of the speed is manipulated
+     * @param speed - the value for the speed
+     */
+    public void setSpeed(double speed) {
+        this.speed = speed;
+    }
+
+    /**
+     * The pane is being retrieved
+     * @return - a value is returned
+     */
+    public Pane getPane() {
+        return InvaderPane;
+    }
+
+
+
+    /**
+     * The invader is drawn
+     */
+    public void drawInvader() {
+        //Body of invader
+        body.setFill(color); //Set random body color
+        body.setCenterX(centerX);
+        body.setCenterY(centerY);
+        body.setRadiusY(height);
+        body.setRadiusX(width);
+     }
+     
+    /**
+     * The invaders will be moving to the right
+     */
+    public void moveRight()
+     {
+         centerX++;
+         
+         drawInvader();
+     }
+     
+    /**
+     * This destroys the invader
+     */
+    public void destroyInvader(){
+         InvaderPane.getChildren().remove(body);
+         
+     }
+}
+
+
+/*
+ * The projectile for hitting the enemy invaders.
+ */
+
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+
+
+public class Bullet{
+    private Circle bullet;
+    private double radius;
+    private double centerX;
+    private double centerY;
+    private Color color;
+    private InvaderPane pane;
+
+    /**
+     * The constructor for the dimensions of the bullet
+     * @param radius - the size of the bullet
+     * @param centerX - the place on the X-axis
+     * @param centerY - the place on the Y-axis
+     * @param pane - the pane for the game pane
+     */
+    public Bullet(double radius,double centerX,double centerY, InvaderPane pane) {
+        this.bullet = new Circle();
+        this.radius = radius;
+        this.centerX = centerX;
+        this.centerY = centerY;
+       
+        this.pane = pane;
+        
+        pane.getChildren().add(bullet);
+        drawBullet();
+    }
+
+    /**
+     * Bullet shape is created
+     * @return - a value is returned
+     */
+    public Circle getBullet() {
+        return bullet;
+    }
+
+    /**
+     * Bullet is placed in the X-axis
+     * @return - a value is returned
+     */
+    public double getCenterX() {
+        return centerX;
+    }
+
+    /**
+     * Place for the bullet
+     * @param centerX - the place on the X-axis
+     */
+    public void setCenterX(double centerX) {
+        this.centerX = centerX;
+    }
+
+    /**
+     * Bullet is placed in the Y-axis
+     * @return - a value is returned
+     */
+    public double getCenterY() {
+        return centerY;
+    }
+
+    /**
+     * Place for the bullet
+     * @param centerY - the place on the Y-axis
+     */
+    public void setCenterY(double centerY) {
+        this.centerY = centerY;
+    }
+
+    /**
+     * Bullet is to be set
+     * @param bullet - bullet for the launcher
+     */
+    public void setBullet(Circle bullet) {
+        this.bullet = bullet;
+    }
+
+    /**
+     * Size of bullet is gained
+     * @return - value is returned
+     */
+    public double getRadius() {
+        return radius;
+    }
+
+    /**
+     * Size the bullet to be set
+     * @param radius - radius to be set
+     */
+    public void setRadius(double radius) {
+        this.radius = radius;
+    }
+
+    /**
+     * Color is gained
+     * @return - value to be returned
+     */
+    public Color getColor() {
+        return color;
+    }
+
+    /**
+     * Color is to be set
+     * @param color - color is set
+     */
+    public void setColor(Color color) {
+        this.color = color;
+    }
+
+    /**
+     * Obtains the game pane
+     * @return - value is returned
+     */
+    public InvaderPane getPane() {
+        return pane;
+    }
+
+    /**
+     * Pane is set
+     * @param pane- game pane
+     */
+    public void setPane(InvaderPane pane) {
+        this.pane = pane;
+    }
+    
+    /**
+     * Bullet is Drawn
+     */
+    public void drawBullet(){
+        
+       
+        color = new Color(Math.random(), Math.random(), Math.random(), 1.0);
+        bullet.setFill(color); //Set random body color
+
+        bullet.setRadius(5);
+        bullet.setCenterX(centerX);
+        bullet.setCenterY(centerY);
+        
+        
+    }
+    
+    /**
+     * Moves the bullet
+     */
+    public void moveBullet(){
+        
+        centerY-= 10;
+        drawBullet();
+    }
+    
+    /**
+     * Removes bullet
+     */
+    public void removeBullet(){
+        
+        pane.getChildren().remove(bullet);
+        
+    }
+    
+}
+
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+
+/*
+ * The explosion for after when the ships get hit by the bullet.
+ */
+
+public class Boom {
+
+    private InvaderPane pane;
+    private double centerX;
+    private double centerY;
+    private Text text;
+    private int timer=0;
+
+    /**
+     * The construct for building the Boom
+     * @param centerX - the place on the X-axis
+     * @param centerY - the place on the Y-axis
+     * @param pane - the InvaderPane
+     */
+    public Boom(double centerX,double centerY, InvaderPane pane) {
+        
+        
+        this.centerX = centerX;
+        this.centerY = centerY ;
+        this.pane = pane;
+        this.text= new Text("BOOM!!");
+        
+        pane.getChildren().add(text);
+        
+        drawBoom();
+    }
+ 
+
+        
+    /**
+     * This gets pane for the InvaderPane
+     * @return - returns a value
+     */
+    public InvaderPane getPane() {
+        return pane;
+    }
+
+    /**
+     * Setting of the pane
+     * @param pane - the value for the game pane
+     */
+    public void setPane(InvaderPane pane) {
+        this.pane = pane;
+    }
+
+
+    /**
+     * The boom is draw via text
+     */
+    public void drawBoom() {
+        text.setX(centerX);
+        text.setY(centerY);
+        text.setFont(new Font(10));
+        
+    }
+
+    /**
+     * The timer is increased
+     */
+    public void increaseTimer()
+    {
+        timer++;
+    }
+
+    /**
+     * The timer to control the explosion time
+     * @return - a value to be returned 
+     */
+    public int getTimer()
+    {
+        return timer;
+    }
+
+    /**
+     * The text disappears
+     */
+    public void destroy()
+    {
+        text.setText(null);
+    }
+}
